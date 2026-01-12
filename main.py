@@ -1,3 +1,5 @@
+# main.py
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import traceback
@@ -7,8 +9,12 @@ from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
 from semantic_kernel.connectors.ai.open_ai import OpenAIPromptExecutionSettings
 from semantic_kernel.contents import ChatHistory
 
+# ADD THIS LINE HERE
+from config.settings import settings 
 from kernel.kernel_setup import create_kernel
 from models.schemas import ChatRequest, ChatResponse
+
+# ... rest of your code ...
 
 app = FastAPI(title="Semantic Agent - Assessment First")
 
@@ -45,6 +51,14 @@ Never skip steps. Never assume missing information.
 async def startup_event():
     global kernel
     try:
+        # Check if the key is actually loaded (masked for safety)
+        key = settings.OPENROUTER_API_KEY
+        if not key:
+            print("ERROR: OPENROUTER_API_KEY is empty! Check your .env file.")
+        else:
+            masked_key = f"{key[:10]}...{key[-5:]}"
+            print(f"Loaded API Key: {masked_key}")
+
         kernel = await create_kernel()
         chat_history.add_system_message(SYSTEM_PROMPT)
         print("Kernel initialized successfully")
@@ -62,9 +76,13 @@ async def chat_endpoint(request: ChatRequest):
 
         chat_service = kernel.get_service("openrouter-chat", type=OpenAIChatCompletion)
 
+       # main.py (Update the execution_settings)
+# main.py (Update around line 75-80)
+
         execution_settings = OpenAIPromptExecutionSettings(
             service_id="openrouter-chat",
-            model="openai/gpt-4o-mini",  # change here if you want different model
+            # Use a free model to bypass credit checks
+            model_id="google/gemini-2.0-flash-exp:free", 
             temperature=0.3,
             max_tokens=1800,
             tool_call_behavior="auto_invoke_kernel_functions"

@@ -8,22 +8,25 @@ from config.settings import settings
 async def create_kernel() -> Kernel:
     kernel = Kernel()
 
-    # Create the specialized OpenAI client configured for OpenRouter
+    # OpenRouter requires an 'HTTP-Referer' and 'X-Title' for many models
+    # to avoid the "User not found" 401 error.
+# kernel/kernel_setup.py
+
     openrouter_client = AsyncOpenAI(
         api_key=settings.OPENROUTER_API_KEY,
         base_url=settings.OPENROUTER_BASE_URL,
         default_headers={
-            "HTTP-Referer": "http://localhost:8000", # Required by OpenRouter
-            "X-Title": "Semantic Agent",             # Optional but recommended
+            "HTTP-Referer": "http://localhost:8000",
+            "X-Title": "Semantic Agent",
         }
     )
 
-    # Add the service using the specialized client
+    # Use the custom client when adding the service
     kernel.add_service(
         OpenAIChatCompletion(
             service_id="openrouter-chat",
             ai_model_id="openai/gpt-4o-mini",
-            async_client=openrouter_client
+            async_client=openrouter_client 
         )
     )
 
