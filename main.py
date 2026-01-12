@@ -2,6 +2,7 @@
 
 import traceback
 import uuid
+from typing import List
 from fastapi import FastAPI, HTTPException
 from semantic_kernel import Kernel
 from semantic_kernel.contents import ChatHistory
@@ -15,12 +16,17 @@ from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoic
 from config.settings import settings 
 from config.prompts import SYSTEM_PROMPT 
 from kernel.kernel_setup import create_kernel
-from models.schemas import ChatRequest, ChatResponse
+# IMPORTANT: Ensure QueueRequest is added to models/schemas.py
+from models.schemas import ChatRequest, ChatResponse, QueueRequest 
+from plugins.queue_handler import QueuePlugin 
 
 app = FastAPI(title="Semantic Agent - Assessment First")
 
 kernel: Kernel = None
 chat_history: ChatHistory = ChatHistory()
+
+# Initialize the plugin for direct use
+queue_plugin = QueuePlugin()
 
 @app.on_event("startup")
 async def startup_event():
@@ -44,6 +50,50 @@ async def startup_event():
         print(f"Kernel initialization failed: {str(e)}")
         raise
 
+# --- NEW SHORT & FANCY ENDPOINT ---
+@app.post("/invoke-batch")
+async def invoke_batch(request: QueueRequest):
+    """
+    Directly invokes the batch processing queue.
+    Short, Semantic Kernel-aligned naming.
+    """
+    # Generate a run ID for tracking
+    run_id = str(uuid.uuid4())
+    print(f"Invoking Batch | Run ID: {run_id}")
+
+    # 1. Extract the lists from the request body
+    project_ids = [item.project_id for item in request.items]
+    workbook_ids = [item.workbook_id for item in request.items]
+
+    if not project_ids:
+        return {"success": False, "message": "No items provided for batch invoke", "run_id": run_id}
+
+    try:
+        # 2. Call the plugin logic directly
+        result_log = await queue_plugin.process_items_queue(
+            project_ids=project_ids, 
+            workbook_ids=workbook_ids
+        )
+
+        print(f"Batch Invocation Complete | Run ID: {run_id}")
+
+        return {
+            "success": True,
+            "run_id": run_id,
+            "processed_count": len(project_ids),
+            "log": result_log 
+        }
+
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        print(f"Batch Invocation Error [Run ID: {run_id}]:", error_detail)
+        return {
+            "success": False,
+            "run_id": run_id,
+            "error": str(e)
+        }
+
+# --- EXISTING CHAT ENDPOINT ---
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     if kernel is None:
@@ -51,7 +101,7 @@ async def chat_endpoint(request: ChatRequest):
 
     # Generate a unique Run ID for this execution
     run_id = str(uuid.uuid4())
-    print(f"Processing Run ID: {run_id}")
+    print(f"Processing Chat Run ID: {run_id}")
 
     try:
         chat_history.add_user_message(request.message)
