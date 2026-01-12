@@ -46,14 +46,12 @@ class AssessmentPlugin:
                 
                 response.raise_for_status()
                 
-                try:
-                    result = response.json()
-                    return f"ASSESSMENT SUCCESS! Status: {response.status_code}\nResult: {result}"
-                except:
-                    return f"ASSESSMENT SUCCESS (no json) - Status: {response.status_code}\nBody: {response.text[:1000]}"
+                # SUCCESS: Only show status, NO result body
+                return f"ASSESSMENT SUCCESS! Status: {response.status_code}"
                     
         except httpx.HTTPStatusError as e:
-            error_msg = f"ASSESSMENT FAILED: HTTP {e.response.status_code}\n{e.response.text[:800]}"
-            return error_msg
+            # FAILED: Only show status, NO error body
+            return f"ASSESSMENT FAILED: HTTP {e.response.status_code}"
+            
         except Exception as e:
             return f"ASSESSMENT CRITICAL ERROR: {str(e)}"

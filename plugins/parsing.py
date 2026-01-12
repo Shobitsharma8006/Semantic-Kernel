@@ -1,5 +1,3 @@
-# plugins/parsing.py
-
 from semantic_kernel.functions import kernel_function
 import httpx
 from config.settings import settings
@@ -38,12 +36,17 @@ class ParsingPlugin:
                 )
                 
                 response.raise_for_status()
-                return f"PARSING SUCCESS: {response.text}"
+                
+                # SUCCESS: Only show status, NO response text
+                return f"PARSING SUCCESS! Status: {response.status_code}"
+
+        except httpx.HTTPStatusError as e:
+            # FAILED: Only show status, NO error body
+            return f"PARSING FAILED: HTTP {e.response.status_code}"
 
         except Exception as e:
             return f"PARSING ERROR: {str(e)}"
 
-    # (You can keep the old clean_response function if you want, or remove it)
     @kernel_function(name="clean_response")
     async def clean_response(self, raw_text: str) -> str:
         return raw_text.strip()
