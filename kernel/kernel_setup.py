@@ -1,6 +1,6 @@
 # kernel/kernel_setup.py 
 
-import os
+from openai import AsyncOpenAI
 from semantic_kernel import Kernel
 from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
 from config.settings import settings
@@ -8,13 +8,22 @@ from config.settings import settings
 async def create_kernel() -> Kernel:
     kernel = Kernel()
 
-    os.environ["OPENAI_API_BASE"] = settings.OPENROUTER_BASE_URL
+    # Create the specialized OpenAI client configured for OpenRouter
+    openrouter_client = AsyncOpenAI(
+        api_key=settings.OPENROUTER_API_KEY,
+        base_url=settings.OPENROUTER_BASE_URL,
+        default_headers={
+            "HTTP-Referer": "http://localhost:8000", # Required by OpenRouter
+            "X-Title": "Semantic Agent",             # Optional but recommended
+        }
+    )
 
+    # Add the service using the specialized client
     kernel.add_service(
         OpenAIChatCompletion(
             service_id="openrouter-chat",
-            api_key=settings.OPENROUTER_API_KEY,
-            ai_model_id="openai/gpt-4o-mini"  # or your preferred model
+            ai_model_id="openai/gpt-4o-mini",
+            async_client=openrouter_client
         )
     )
 
