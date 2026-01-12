@@ -1,6 +1,7 @@
 # main.py
 
 import traceback
+import uuid
 from fastapi import FastAPI, HTTPException
 from semantic_kernel import Kernel
 from semantic_kernel.contents import ChatHistory
@@ -12,7 +13,7 @@ from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoic
 
 # Local Imports
 from config.settings import settings 
-from config.prompts import SYSTEM_PROMPT  # <--- Imported from new file
+from config.prompts import SYSTEM_PROMPT 
 from kernel.kernel_setup import create_kernel
 from models.schemas import ChatRequest, ChatResponse
 
@@ -48,6 +49,10 @@ async def chat_endpoint(request: ChatRequest):
     if kernel is None:
         raise HTTPException(status_code=503, detail="Kernel not initialized yet")
 
+    # Generate a unique Run ID for this execution
+    run_id = str(uuid.uuid4())
+    print(f"Processing Run ID: {run_id}")
+
     try:
         chat_history.add_user_message(request.message)
 
@@ -65,7 +70,6 @@ async def chat_endpoint(request: ChatRequest):
         )
 
         # Get response from AI
-        # CRITICAL FIX: passed 'kernel=kernel' so it can execute functions
         result = await chat_service.get_chat_message_content(
             chat_history=chat_history,
             settings=execution_settings,
@@ -76,18 +80,22 @@ async def chat_endpoint(request: ChatRequest):
 
         chat_history.add_assistant_message(final_answer)
 
+        # Return response with the generated run_id
         return ChatResponse(
             response=final_answer,
-            success=True
+            success=True,
+            run_id=run_id  # <--- Return Run ID
         )
 
     except Exception as e:
         error_detail = traceback.format_exc()
-        print("Chat error:", error_detail)
+        # Log the specific run ID with the error for easier debugging
+        print(f"Chat error [Run ID: {run_id}]:", error_detail)
         
         return ChatResponse(
             response=f"Processing error: {str(e)}",
-            success=False
+            success=False,
+            run_id=run_id  # <--- Return Run ID even on error
         )
 
 @app.get("/health")

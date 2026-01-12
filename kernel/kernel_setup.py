@@ -8,10 +8,7 @@ from config.settings import settings
 async def create_kernel() -> Kernel:
     kernel = Kernel()
 
-    # OpenRouter requires an 'HTTP-Referer' and 'X-Title' for many models
-    # to avoid the "User not found" 401 error.
-# kernel/kernel_setup.py
-
+    # OpenRouter Client Configuration
     openrouter_client = AsyncOpenAI(
         api_key=settings.OPENROUTER_API_KEY,
         base_url=settings.OPENROUTER_BASE_URL,
@@ -21,7 +18,6 @@ async def create_kernel() -> Kernel:
         }
     )
 
-    # Use the custom client when adding the service
     kernel.add_service(
         OpenAIChatCompletion(
             service_id="openrouter-chat",
@@ -30,14 +26,13 @@ async def create_kernel() -> Kernel:
         )
     )
 
-   # kernel/kernel_setup.py (Update the bottom part)
-
-    # ... existing code ...
-
+    # --- Import and Add Plugins ---
     from plugins.assessment import AssessmentPlugin
-    from plugins.parsing import ParsingPlugin  # <--- Import this
+    from plugins.parsing import ParsingPlugin
+    from plugins.queue_handler import QueuePlugin  # <--- Import new plugin
 
     kernel.add_plugin(AssessmentPlugin(), "AssessmentTools")
-    kernel.add_plugin(ParsingPlugin(), "ParsingTools") # <--- Add this
+    kernel.add_plugin(ParsingPlugin(), "ParsingTools")
+    kernel.add_plugin(QueuePlugin(), "QueueTools") # <--- Add new plugin
 
     return kernel
