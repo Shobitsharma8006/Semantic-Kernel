@@ -1,8 +1,17 @@
-
+# Virtual Environments (Heavy, machine-specific)
 venv/
-__pycache__/
-.env/
 env/
-.cache/
 .venv/
+
+# Python Bytecode (Generated automatically)
+__pycache__/
+
+# Environment Variables & Secrets (CRITICAL SECURITY)
+.env
+.env/
+
+# Cache directories
+.cache/
+
+# IDE/Editor Settings (Personal preferences)
 .vscode/

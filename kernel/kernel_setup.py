@@ -30,7 +30,14 @@ async def create_kernel() -> Kernel:
         )
     )
 
+   # kernel/kernel_setup.py (Update the bottom part)
+
+    # ... existing code ...
+
     from plugins.assessment import AssessmentPlugin
+    from plugins.parsing import ParsingPlugin  # <--- Import this
+
     kernel.add_plugin(AssessmentPlugin(), "AssessmentTools")
+    kernel.add_plugin(ParsingPlugin(), "ParsingTools") # <--- Add this
 
     return kernel

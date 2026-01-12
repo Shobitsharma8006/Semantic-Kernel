@@ -38,7 +38,7 @@ class AssessmentPlugin:
         try:
             async with await get_client() as client:
                 response = await client.post(
-                    settings.ASSESSMENT_API_URL,
+                    settings.ASSESSMENT_API_URL + "/api/assessment",
                     json=payload,
                     timeout=60.0,
                     headers={"Content-Type": "application/json"}

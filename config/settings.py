@@ -5,17 +5,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # OpenRouter (required)
-    OPENROUTER_API_KEY: str = ""
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"   # ← add this line!
+    # API Keys & Base URLs (Required)
+    OPENROUTER_API_KEY: str
+    OPENROUTER_BASE_URL: str
 
-    # Assessment API
-    ASSESSMENT_API_URL: str = "http://0.0.0.0:5001/api/assessment"
+    # Service Endpoints (Required)
+    ASSESSMENT_API_URL: str
+    PARSING_API_URL: str
 
-    # Optional timeouts etc.
-    REQUEST_TIMEOUT: float = 60.0
+    # Configuration (Required)
+    REQUEST_TIMEOUT: float
 
     model_config = SettingsConfigDict(
+        # This tells Pydantic to read the .env file from the project root
         env_file=Path(__file__).parent.parent / ".env",
         env_file_encoding="utf-8",
         extra="ignore"
