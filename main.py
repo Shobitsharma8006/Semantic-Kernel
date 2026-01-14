@@ -3,6 +3,7 @@
 import traceback
 import uuid
 from typing import List
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from semantic_kernel import Kernel
 from semantic_kernel.contents import ChatHistory
@@ -18,6 +19,7 @@ from config.prompts import SYSTEM_PROMPT
 from kernel.kernel_setup import create_kernel
 from models.schemas import ChatRequest, ChatResponse, QueueRequest 
 from plugins.queue_handler import QueuePlugin 
+from services.http_client import get_client
 
 app = FastAPI(title="Semantic Agent - Assessment First")
 
@@ -41,17 +43,16 @@ async def startup_event():
 
         kernel = await create_kernel()
         chat_history.add_system_message(SYSTEM_PROMPT)
-        print("Kernel initialized successfully")
+        print("Application startup complete.")
     except Exception as e:
         print(f"Kernel initialization failed: {str(e)}")
         raise
 
-# --- UPDATED ENDPOINT ---
+# --- UPDATED ENDPOINT WITH MONGODB LOGGING ---
 @app.post("/invoke-batch")
 async def invoke_batch(request: QueueRequest):
     """
-    Directly invokes the batch processing queue.
-    Returns a clean JSON response without the large log string.
+    Directly invokes the batch processing queue and logs results to MongoDB API.
     """
     # Generate a run ID for tracking
     run_id = str(uuid.uuid4())
@@ -64,36 +65,78 @@ async def invoke_batch(request: QueueRequest):
     if not project_ids:
         return {"success": False, "message": "No items provided for batch invoke", "run_id": run_id}
 
+    items_run = [
+        {"project_id": pid, "workbook_id": wid}
+        for pid, wid in zip(project_ids, workbook_ids)
+    ]
+
     try:
         # 2. Call the plugin logic directly
-        # We capture the log for server-side printing, but we won't return it to the user
         result_log = await queue_plugin.process_items_queue(
             project_ids=project_ids, 
             workbook_ids=workbook_ids,
             run_id=run_id
         )
 
-        # Print the log to the server console instead so you can still debug if needed
+        # Print the log to the server console
         print(f"--- Log for Run {run_id} ---\n{result_log}\n-----------------------------")
-
-        # 3. Create a clean list of exactly what was run
-        items_run = [
-            {"project_id": pid, "workbook_id": wid}
-            for pid, wid in zip(project_ids, workbook_ids)
-        ]
-
         print(f"Batch Invocation Complete | Run ID: {run_id}")
+
+        # 3. Format full record for your MongoDB API
+        full_record_text = (
+            f"Invoking Batch | Run ID: {run_id}\n"
+            f"--- Log for Run {run_id} ---\n"
+            f"{result_log}\n"
+            f"-----------------------------\n"
+            f"Batch Invocation Complete | Run ID: {run_id}"
+        )
+
+        # 4. POST the record to your MongoDB logging API
+        try:
+            async with await get_client() as client:
+                await client.post(
+                    f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
+                    json={
+                        "run_id": run_id,
+                        "type": "BATCH_INVOCATION",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "full_log": full_record_text,
+                        "processed_items": items_run,
+                        "status": "SUCCESS"
+                    },
+                    timeout=10.0
+                )
+        except Exception as log_err:
+            print(f"Failed to send log to MongoDB API: {str(log_err)}")
 
         return {
             "success": True,
             "run_id": run_id,
             "processed_count": len(project_ids),
-            "processed_items": items_run  # <--- Shows which IDs were processed
+            "processed_items": items_run 
         }
 
     except Exception as e:
         error_detail = traceback.format_exc()
         print(f"Batch Invocation Error [Run ID: {run_id}]:", error_detail)
+
+        # Log the failure to MongoDB API
+        try:
+            async with await get_client() as client:
+                await client.post(
+                    f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
+                    json={
+                        "run_id": run_id,
+                        "type": "BATCH_INVOCATION",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "error": str(e),
+                        "stack_trace": error_detail,
+                        "status": "FAILED"
+                    }
+                )
+        except:
+            pass
+
         return {
             "success": False,
             "run_id": run_id,

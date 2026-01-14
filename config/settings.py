@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ASSESSMENT_API_URL: str
     PARSING_API_URL: str
     MAPPING_API_URL: str
+    MONGODB_LOG_API_URL: str 
 
     # Configuration (Required)
     REQUEST_TIMEOUT: float
