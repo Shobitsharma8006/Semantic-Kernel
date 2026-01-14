@@ -15,14 +15,16 @@ class ParsingPlugin:
     async def parse_xml_data(
         self,
         project_id: str,
-        workbook_id: str
+        workbook_id: str,
+        run_id: str
     ) -> str:
         """
         Sends request to /parse-xml endpoint.
         """
         payload = {
             "project_id": project_id,
-            "workbook_id": workbook_id
+            "workbook_id": workbook_id,
+            "run_id": run_id 
         }
 
         try:

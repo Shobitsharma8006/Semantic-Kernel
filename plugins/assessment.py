@@ -18,13 +18,14 @@ class AssessmentPlugin:
     async def run_assessment(
         self,
         project_id: str,
-        workbook_id: str
+        workbook_id: str,
+        run_id: str  # Add run_id parameter
     ) -> str:
         """
         Required parameters:
         - project_id: must be valid UUID
         - workbook_id: must be valid UUID
-        
+        - run_id: must be valid UUID
         Returns success message or detailed error
         """
         if not project_id or not workbook_id:
@@ -32,7 +33,8 @@ class AssessmentPlugin:
         
         payload = {
             "project_id": project_id,
-            "workbook_id": workbook_id
+            "workbook_id": workbook_id,
+            "run_id": run_id  
         }
         
         try:

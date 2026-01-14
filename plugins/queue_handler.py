@@ -20,7 +20,8 @@ class QueuePlugin:
     async def process_items_queue(
         self,
         project_ids: List[str],
-        workbook_ids: List[str]
+        workbook_ids: List[str],
+        run_id: str
     ) -> str:
         """
         Takes lists of IDs and processes them one by one in order.
@@ -41,10 +42,10 @@ class QueuePlugin:
                 # --- STEP 1: ASSESSMENT ---
                 try:
                     assess_res = await client.post(
-                        settings.ASSESSMENT_API_URL + "/api/assessment",
-                        json={"project_id": pid, "workbook_id": wid},
-                        timeout=60.0
-                    )
+                    settings.ASSESSMENT_API_URL + "/api/assessment",
+                    json={"project_id": pid, "workbook_id": wid, "run_id": run_id}, # Pass run_id
+                    timeout=60.0
+                )
                     assess_res.raise_for_status()
                 except Exception as e:
                     results.append(f"❌ {item_label}: Assessment Failed ({str(e)}) - Skipping Parsing")
@@ -53,10 +54,10 @@ class QueuePlugin:
                 # --- STEP 2: PARSING (Only runs if Assessment passed) ---
                 try:
                     parse_res = await client.post(
-                        settings.PARSING_API_URL + "/parse-xml",
-                        json={"project_id": pid, "workbook_id": wid},
-                        timeout=60.0
-                    )
+                    settings.PARSING_API_URL + "/parse-xml",
+                    json={"project_id": pid, "workbook_id": wid, "run_id": run_id}, # Pass run_id
+                    timeout=60.0
+                )
                     parse_res.raise_for_status()
                     results.append(f"✅ {item_label}: Assessment OK -> Parsing OK")
                 except Exception as e:

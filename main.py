@@ -69,7 +69,8 @@ async def invoke_batch(request: QueueRequest):
         # We capture the log for server-side printing, but we won't return it to the user
         result_log = await queue_plugin.process_items_queue(
             project_ids=project_ids, 
-            workbook_ids=workbook_ids
+            workbook_ids=workbook_ids,
+            run_id=run_id
         )
 
         # Print the log to the server console instead so you can still debug if needed
