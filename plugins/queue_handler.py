@@ -15,6 +15,7 @@ class QueuePlugin:
         For each project/workbook pair, it strictly follows the flow: 
         1. Run Assessment 
         2. If Assessment succeeds, Run Parsing.
+        3. If Parsing succeeds, Run Mapping.
         """
     )
     async def process_items_queue(
@@ -38,29 +39,44 @@ class QueuePlugin:
         async with await get_client() as client:
             for i, (pid, wid) in enumerate(zip(project_ids, workbook_ids)):
                 item_label = f"Item {i+1} ({pid})"
+                parsing_ok = False
                 
                 # --- STEP 1: ASSESSMENT ---
                 try:
                     assess_res = await client.post(
-                    settings.ASSESSMENT_API_URL + "/api/assessment",
-                    json={"project_id": pid, "workbook_id": wid, "run_id": run_id}, # Pass run_id
-                    timeout=60.0
-                )
+                        settings.ASSESSMENT_API_URL + "/api/assessment",
+                        json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                        timeout=60.0
+                    )
                     assess_res.raise_for_status()
                 except Exception as e:
                     results.append(f"❌ {item_label}: Assessment Failed ({str(e)}) - Skipping Parsing")
-                    continue # Skip to next item in loop
+                    continue
 
-                # --- STEP 2: PARSING (Only runs if Assessment passed) ---
+                # --- STEP 2: PARSING ---
                 try:
                     parse_res = await client.post(
-                    settings.PARSING_API_URL + "/parse-xml",
-                    json={"project_id": pid, "workbook_id": wid, "run_id": run_id}, # Pass run_id
-                    timeout=60.0
-                )
+                        settings.PARSING_API_URL + "/parse-xml",
+                        json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                        timeout=60.0
+                    )
                     parse_res.raise_for_status()
-                    results.append(f"✅ {item_label}: Assessment OK -> Parsing OK")
+                    parsing_ok = True
                 except Exception as e:
                     results.append(f"⚠️ {item_label}: Assessment OK -> Parsing Failed ({str(e)})")
+                    parsing_ok = False
+
+                # --- STEP 3: MAPPING ---
+                if parsing_ok:
+                    try:
+                        map_res = await client.post(
+                            settings.MAPPING_API_URL + "/mapping",
+                            json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                            timeout=60.0
+                        )
+                        map_res.raise_for_status()
+                        results.append(f"✅ {item_label}: Assessment OK -> Parsing OK -> Mapping OK")
+                    except Exception as e:
+                        results.append(f"⚠️ {item_label}: Parsing OK -> Mapping Failed ({str(e)})")
 
         return "\n".join(results)

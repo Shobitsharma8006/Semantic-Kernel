@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Service Endpoints (Required)
     ASSESSMENT_API_URL: str
     PARSING_API_URL: str
+    MAPPING_API_URL: str
 
     # Configuration (Required)
     REQUEST_TIMEOUT: float

@@ -29,10 +29,12 @@ async def create_kernel() -> Kernel:
     # --- Import and Add Plugins ---
     from plugins.assessment import AssessmentPlugin
     from plugins.parsing import ParsingPlugin
-    from plugins.queue_handler import QueuePlugin  # <--- Import new plugin
+    from plugins.queue_handler import QueuePlugin 
+    from plugins.mapping import MappingPlugin
 
     kernel.add_plugin(AssessmentPlugin(), "AssessmentTools")
     kernel.add_plugin(ParsingPlugin(), "ParsingTools")
-    kernel.add_plugin(QueuePlugin(), "QueueTools") # <--- Add new plugin
+    kernel.add_plugin(QueuePlugin(), "QueueTools")
+    kernel.add_plugin(MappingPlugin(), "MappingTools")
 
     return kernel
