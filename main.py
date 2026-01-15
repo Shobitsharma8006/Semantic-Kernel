@@ -33,7 +33,7 @@ queue_plugin = QueuePlugin()
 async def startup_event():
     global kernel
     try:
-        # Check if the key is actually loaded (masked for safety)
+        # Check if the key is actually loaded
         key = settings.OPENROUTER_API_KEY
         if not key:
             print("ERROR: OPENROUTER_API_KEY is empty! Check your .env file.")
@@ -48,17 +48,15 @@ async def startup_event():
         print(f"Kernel initialization failed: {str(e)}")
         raise
 
-# --- UPDATED ENDPOINT WITH MONGODB LOGGING ---
+# --- UPDATED ENDPOINT WITH MONGODB LOGGING ALIGNED TO AgentResultCreate ---
 @app.post("/invoke-batch")
 async def invoke_batch(request: QueueRequest):
     """
-    Directly invokes the batch processing queue and logs results to MongoDB API.
+    Directly invokes the batch processing queue and logs formatted results to MongoDB API.
     """
-    # Generate a run ID for tracking
     run_id = str(uuid.uuid4())
     print(f"Invoking Batch | Run ID: {run_id}")
 
-    # 1. Extract the lists from the request body
     project_ids = [item.project_id for item in request.items]
     workbook_ids = [item.workbook_id for item in request.items]
 
@@ -71,18 +69,14 @@ async def invoke_batch(request: QueueRequest):
     ]
 
     try:
-        # 2. Call the plugin logic directly
+        # 1. Call the plugin logic
         result_log = await queue_plugin.process_items_queue(
             project_ids=project_ids, 
             workbook_ids=workbook_ids,
             run_id=run_id
         )
 
-        # Print the log to the server console
-        print(f"--- Log for Run {run_id} ---\n{result_log}\n-----------------------------")
-        print(f"Batch Invocation Complete | Run ID: {run_id}")
-
-        # 3. Format full record for your MongoDB API
+        # 2. Construct the exact log format requested
         full_record_text = (
             f"Invoking Batch | Run ID: {run_id}\n"
             f"--- Log for Run {run_id} ---\n"
@@ -91,18 +85,23 @@ async def invoke_batch(request: QueueRequest):
             f"Batch Invocation Complete | Run ID: {run_id}"
         )
 
-        # 4. POST the record to your MongoDB logging API
+        # Print to console
+        print(full_record_text)
+
+        # 3. POST the record to MongoDB API using AgentResultCreate schema
         try:
             async with await get_client() as client:
                 await client.post(
                     f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
                     json={
-                        "run_id": run_id,
-                        "type": "BATCH_INVOCATION",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "full_log": full_record_text,
-                        "processed_items": items_run,
-                        "status": "SUCCESS"
+                        "project_name": "Semantic-Kernel-Agent",  # Required field
+                        "run_id": run_id,                         # Required field
+                        "status": "completed",                    # Required field
+                        "payload": {                              # Required field (Dict)
+                            "full_console_output": full_record_text,
+                            "processed_items": items_run,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
                     },
                     timeout=10.0
                 )
@@ -126,12 +125,14 @@ async def invoke_batch(request: QueueRequest):
                 await client.post(
                     f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
                     json={
+                        "project_name": "Semantic-Kernel-Agent-Error",
                         "run_id": run_id,
-                        "type": "BATCH_INVOCATION",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "error": str(e),
-                        "stack_trace": error_detail,
-                        "status": "FAILED"
+                        "status": "failed",
+                        "payload": {
+                            "error": str(e),
+                            "stack_trace": error_detail,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
                     }
                 )
         except:
@@ -154,7 +155,6 @@ async def chat_endpoint(request: ChatRequest):
 
     try:
         chat_history.add_user_message(request.message)
-
         chat_service = kernel.get_service("openrouter-chat", type=OpenAIChatCompletion)
 
         execution_settings = OpenAIPromptExecutionSettings(
