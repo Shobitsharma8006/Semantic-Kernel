@@ -48,7 +48,7 @@ async def startup_event():
         print(f"Kernel initialization failed: {str(e)}")
         raise
 
-# --- UPDATED ENDPOINT WITH MONGODB LOGGING ALIGNED TO AgentResultCreate ---
+# --- UPDATED ENDPOINT WITH MONGODB LOGGING ALIGNED TO AgentLog ---
 @app.post("/invoke-batch")
 async def invoke_batch(request: QueueRequest):
     """
@@ -70,37 +70,47 @@ async def invoke_batch(request: QueueRequest):
 
     try:
         # 1. Call the plugin logic
-        result_log = await queue_plugin.process_items_queue(
+        # result_log now returns a list of dicts based on the updated plugin
+        detailed_results = await queue_plugin.process_items_queue(
             project_ids=project_ids, 
             workbook_ids=workbook_ids,
             run_id=run_id
         )
 
-        # 2. Construct the exact log format requested
+        # 2. Construct the log text for console and the 'details' field
+        log_summary = "\n".join([
+            f"Project: {res['project_id']} | Status: {res['final_status']}"
+            for res in detailed_results
+        ])
+
         full_record_text = (
             f"Invoking Batch | Run ID: {run_id}\n"
             f"--- Log for Run {run_id} ---\n"
-            f"{result_log}\n"
+            f"{log_summary}\n"
             f"-----------------------------\n"
             f"Batch Invocation Complete | Run ID: {run_id}"
         )
 
-        # Print to console
         print(full_record_text)
 
-        # 3. POST the record to MongoDB API using AgentResultCreate schema
+        # 3. POST the record to MongoDB API using the /logs endpoint
         try:
             async with await get_client() as client:
                 await client.post(
-                    f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
+                    f"{settings.MONGODB_LOG_API_URL}/api/records/logs",
                     json={
-                        "project_name": "Semantic-Kernel-Agent",  # Required field
-                        "run_id": run_id,                         # Required field
-                        "status": "completed",                    # Required field
-                        "payload": {                              # Required field (Dict)
-                            "full_console_output": full_record_text,
+                        "project_name": project_ids[0] if project_ids else "Batch",
+                        "run_id": run_id,
+                        "agent_name": "Main Batch Agent",
+                        "log_level": "INFO",
+                        "message": "Batch Invocation Complete",
+                        "project_id": project_ids[0] if project_ids else "",
+                        "workbook_id": workbook_ids[0] if workbook_ids else "",
+                        "details": {
+                            "type": "BATCH_INVOCATION",
+                            "full_log": full_record_text,
                             "processed_items": items_run,
-                            "timestamp": datetime.utcnow().isoformat()
+                            "status": "SUCCESS"
                         }
                     },
                     timeout=10.0
@@ -123,12 +133,14 @@ async def invoke_batch(request: QueueRequest):
         try:
             async with await get_client() as client:
                 await client.post(
-                    f"{settings.MONGODB_LOG_API_URL}/api/records/validation",
+                    f"{settings.MONGODB_LOG_API_URL}/api/records/logs",
                     json={
-                        "project_name": "Semantic-Kernel-Agent-Error",
+                        "project_name": "Semantic-Kernel-Error",
                         "run_id": run_id,
-                        "status": "failed",
-                        "payload": {
+                        "agent_name": "Main Batch Agent",
+                        "log_level": "ERROR",
+                        "message": f"Batch process failed: {str(e)}",
+                        "details": {
                             "error": str(e),
                             "stack_trace": error_detail,
                             "timestamp": datetime.utcnow().isoformat()

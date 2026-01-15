@@ -19,10 +19,11 @@ class QueuePlugin:
         run_id: str
     ) -> List[Dict[str, Any]]:
         detailed_results = []
+        # INITIALIZE final_log here to prevent NameError
+        final_log = "No items processed" 
         
         async with await get_client() as client:
             for pid, wid in zip(project_ids, workbook_ids):
-                # Initialize structured tracking for this specific project
                 project_status = {
                     "project_id": pid,
                     "workbook_id": wid,
@@ -37,8 +38,11 @@ class QueuePlugin:
 
                 # --- STEP 1: ASSESSMENT ---
                 try:
-                    res = await client.post(f"{settings.ASSESSMENT_API_URL}/api/assessment", 
-                                            json={"project_id": pid, "workbook_id": wid, "run_id": run_id})
+                    res = await client.post(
+                        f"{settings.ASSESSMENT_API_URL}/api/assessment", 
+                        json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                        timeout=60.0
+                    )
                     res.raise_for_status()
                     project_status["steps"]["assessment"] = "COMPLETED"
                 except Exception as e:
@@ -51,8 +55,11 @@ class QueuePlugin:
                 # --- STEP 2: PARSING ---
                 project_status["steps"]["parsing"] = "PENDING"
                 try:
-                    res = await client.post(f"{settings.PARSING_API_URL}/parse-xml", 
-                                            json={"project_id": pid, "workbook_id": wid, "run_id": run_id})
+                    res = await client.post(
+                        f"{settings.PARSING_API_URL}/parse-xml", 
+                        json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                        timeout=60.0
+                    )
                     res.raise_for_status()
                     project_status["steps"]["parsing"] = "COMPLETED"
                 except Exception as e:
@@ -65,8 +72,11 @@ class QueuePlugin:
                 # --- STEP 3: MAPPING ---
                 project_status["steps"]["mapping"] = "PENDING"
                 try:
-                    res = await client.post(f"{settings.MAPPING_API_URL}/mapping", 
-                                            json={"project_id": pid, "workbook_id": wid, "run_id": run_id})
+                    res = await client.post(
+                        f"{settings.MAPPING_API_URL}/mapping", 
+                        json={"project_id": pid, "workbook_id": wid, "run_id": run_id},
+                        timeout=60.0
+                    )
                     res.raise_for_status()
                     project_status["steps"]["mapping"] = "COMPLETED"
                     project_status["final_status"] = "SUCCESS"
@@ -77,23 +87,35 @@ class QueuePlugin:
 
                 detailed_results.append(project_status)
 
+            # --- CONSTRUCT FINAL LOG TEXT AFTER LOOP ---
+            if detailed_results:
+                log_lines = []
+                for res in detailed_results:
+                    icon = "✅" if res["final_status"] == "SUCCESS" else "❌"
+                    if res["final_status"] == "WARNING": icon = "⚠️"
+                    log_lines.append(f"{icon} Project {res['project_id']}: {res['final_status']}")
+                final_log = "\n".join(log_lines)
+
             # --- LOG TO MONGODB ---
             log_payload = {
-                "project_name": "Semantic-Kernel-Agent",
+                "project_name": project_ids[0] if project_ids else "Batch",
                 "run_id": run_id,
-                "status": "completed",
-                "payload": {
-                    "total_projects": len(project_ids),
-                    "execution_summary": detailed_results, # Each project is now its own object
-                    "timestamp": datetime.utcnow().isoformat()
+                "agent_name": "Semantic Kernel Queue Agent",
+                "log_level": "INFO",
+                "message": "Batch process summary",
+                "project_id": project_ids[0] if project_ids else "",
+                "workbook_id": workbook_ids[0] if workbook_ids else "",
+                "details": {
+                    "log_content": final_log, # Now guaranteed to be defined
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "status": "COMPLETED"
                 }
             }
+            
             try:
-                await client.post(f"{settings.MONGODB_LOG_API_URL}/api/records/validation", json=log_payload)
+                # Update endpoint to /logs
+                await client.post(f"{settings.MONGODB_LOG_API_URL}/api/records/logs", json=log_payload)
             except Exception as e:
                 print(f"Logging Error: {e}")
 
         return detailed_results
-
-
-        
