@@ -16,10 +16,11 @@ class ParsingPlugin:
         self,
         project_id: str,
         workbook_id: str,
-        run_id: str
+        run_id: str,
+        token: str = None  # Added token parameter
     ) -> str:
         """
-        Sends request to /parse-xml endpoint.
+        Sends request to /parse-xml endpoint with Authorization.
         """
         payload = {
             "project_id": project_id,
@@ -28,8 +29,8 @@ class ParsingPlugin:
         }
 
         try:
-            # We use the shared http client
-            async with await get_client() as client:
+            # Pass the token to the shared http client
+            async with await get_client(token=token) as client:
                 response = await client.post(
                     settings.PARSING_API_URL + "/parse-xml",
                     json=payload,
@@ -38,14 +39,10 @@ class ParsingPlugin:
                 )
                 
                 response.raise_for_status()
-                
-                # SUCCESS: Only show status, NO response text
                 return f"PARSING SUCCESS! Status: {response.status_code}"
 
         except httpx.HTTPStatusError as e:
-            # FAILED: Only show status, NO error body
             return f"PARSING FAILED: HTTP {e.response.status_code}"
-
         except Exception as e:
             return f"PARSING ERROR: {str(e)}"
 

@@ -1,0 +1,64 @@
+# =========================
+# CI Pipeline: Dev → ACR
+# =========================
+
+trigger:
+  branches:
+    include:
+      - dev   # Azure DevOps limitation: variables not allowed here
+
+pr:
+  branches:
+    include:
+      - dev   # Azure DevOps limitation: variables not allowed here
+
+variables:
+  # -------- Pipeline --------
+  vmImage: 'ubuntu-latest'
+  environment: 'dev'
+
+  # -------- Docker --------
+  dockerfilePath: 'Dockerfile'
+  buildContext: '.'
+
+  # -------- Image --------
+  imageName: 't2f-semantic-kernal'
+  imageRepository: '$(imageName)-$(environment)'
+
+  # -------- Registry --------
+  acrServiceConnection: 'vlt2facrdev-sc-dr'
+
+  # -------- Tags --------
+  tagLatest: 'latest'
+  tagBuildId: '$(Build.BuildId)'
+
+pool:
+  vmImage: $(vmImage)
+
+steps:
+- checkout: self
+  clean: true
+
+- script: |
+    if [ ! -f "$(dockerfilePath)" ]; then
+      echo "Dockerfile not found at $(dockerfilePath)"
+      exit 1
+    fi
+  displayName: 'Validate Dockerfile'
+
+- task: Docker@2
+  displayName: 'Build and Push Image'
+  inputs:
+    containerRegistry: $(acrServiceConnection)
+    repository: $(imageRepository)
+    command: buildAndPush
+    Dockerfile: $(dockerfilePath)
+    buildContext: $(buildContext)
+    tags: |
+      $(tagLatest)
+      $(tagBuildId)
+
+- script: |
+    echo "Image successfully pushed:"
+    echo "$(imageRepository):$(tagBuildId)"
+  displayName: 'Log Image Details'

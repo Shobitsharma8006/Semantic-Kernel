@@ -18,10 +18,11 @@ class MappingPlugin:
         self,
         project_id: str,
         workbook_id: str,
-        run_id: str
+        run_id: str,
+        token: str = None  # Added token parameter
     ) -> str:
         """
-        Sends request to /mapping endpoint.
+        Sends request to /mapping endpoint with Authorization.
         """
         payload = {
             "project_id": project_id,
@@ -30,8 +31,7 @@ class MappingPlugin:
         }
 
         try:
-            async with await get_client() as client:
-                # Assuming base URL is handled in settings, or use the direct 127.0.0.1:9000
+            async with await get_client(token=token) as client:
                 response = await client.post(
                     settings.MAPPING_API_URL + "/mapping",
                     json=payload,

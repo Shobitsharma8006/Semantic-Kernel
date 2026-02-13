@@ -1,40 +1,66 @@
-# kernel/kernel_setup.py 
-
-from openai import AsyncOpenAI
+# kernel/kernel_setup.py
+ 
 from semantic_kernel import Kernel
-from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion # Import change
+
 from config.settings import settings
-
+ 
 async def create_kernel() -> Kernel:
+
     kernel = Kernel()
+ 
+    # Azure OpenAI Service Configuration
 
-    # OpenRouter Client Configuration
-    openrouter_client = AsyncOpenAI(
-        api_key=settings.OPENROUTER_API_KEY,
-        base_url=settings.OPENROUTER_BASE_URL,
-        default_headers={
-            "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "Semantic Agent",
-        }
+    # Ab AsyncOpenAI client ki zarurat nahi hai, Semantic Kernel ise khud handle karta hai
+
+    # kernel.add_service(
+
+    #     AzureChatCompletion(
+
+    #         service_id="azure-chat",
+
+    #         deployment_name=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+
+    #         endpoint=settings.AZURE_OPENAI_ENDPOINT,
+
+    #         api_key=settings.AZURE_OPENAI_API_KEY,
+
+    #     )
+
+    # )
+    chat_service = AzureChatCompletion(
+        service_id="azure-chat",
+        deployment_name=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+        endpoint=settings.AZURE_OPENAI_ENDPOINT,
+        api_key=settings.AZURE_OPENAI_API_KEY,
+        api_version=settings.AZURE_OPENAI_API_VERSION,
     )
 
-    kernel.add_service(
-        OpenAIChatCompletion(
-            service_id="openrouter-chat",
-            ai_model_id="openai/gpt-4o-mini",
-            async_client=openrouter_client 
-        )
-    )
+    kernel.add_service(chat_service)
+
 
     # --- Import and Add Plugins ---
+
     from plugins.assessment import AssessmentPlugin
+
     from plugins.parsing import ParsingPlugin
+
     from plugins.queue_handler import QueuePlugin 
+
     from plugins.mapping import MappingPlugin
 
-    kernel.add_plugin(AssessmentPlugin(), "AssessmentTools")
-    kernel.add_plugin(ParsingPlugin(), "ParsingTools")
-    kernel.add_plugin(QueuePlugin(), "QueueTools")
-    kernel.add_plugin(MappingPlugin(), "MappingTools")
+    from plugins.monitoring import MonitoringAgentPlugin
+ 
+    kernel.add_plugin(MonitoringAgentPlugin(), "MonitoringAgentTools")
 
+    kernel.add_plugin(AssessmentPlugin(), "AssessmentTools")
+
+    kernel.add_plugin(ParsingPlugin(), "ParsingTools")
+
+    kernel.add_plugin(QueuePlugin(), "QueueTools")
+
+    kernel.add_plugin(MappingPlugin(), "MappingTools")
+ 
     return kernel
+ 

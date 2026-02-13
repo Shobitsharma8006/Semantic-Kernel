@@ -3,7 +3,6 @@ import httpx
 from config.settings import settings
 from services.http_client import get_client
 
-
 class AssessmentPlugin:
     
     @kernel_function(
@@ -19,7 +18,8 @@ class AssessmentPlugin:
         self,
         project_id: str,
         workbook_id: str,
-        run_id: str  # Add run_id parameter
+        run_id: str,  # <--- Added missing comma here
+        token: str = None
     ) -> str:
         """
         Required parameters:
@@ -38,7 +38,8 @@ class AssessmentPlugin:
         }
         
         try:
-            async with await get_client() as client:
+            # Pass the token to the client for authentication
+            async with await get_client(token=token) as client:
                 response = await client.post(
                     settings.ASSESSMENT_API_URL + "/api/assessment",
                     json=payload,

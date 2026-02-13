@@ -21,3 +21,5 @@ class QueueItem(BaseModel):
 class QueueRequest(BaseModel):
     # This accepts an array of items
     items: List[QueueItem]
+    email: str
+    
